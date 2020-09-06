@@ -1,9 +1,7 @@
-import "regenerator-runtime/runtime.js";
-import { get } from "httpie/dist/httpie.mjs";
-import unread from "unread";
-import apollo from "apollo-server";
-const { ApolloServer, gql } = apollo;
-const { parse } = unread;
+require("regenerator-runtime/runtime");
+const { get } = require("httpie");
+const { parse } = require("unread");
+const { ApolloServer, gql } = require("apollo-server-micro");
 
 const typeDefs = gql`
 	type Feed {
@@ -50,7 +48,7 @@ const resolvers = {
 	},
 	Feed: {
 		title: ({ feed }) => feed.title(),
-		links: ({ feed }) => feed.links()?.map(({ href }) => href),
+		links: ({ feed }) => feed.links() && feed.links().map(({ href }) => href),
 		description: ({ feed }) => feed.description(),
 		feedURL: ({ feed }) => feed.feedURL(),
 		updated: ({ feed }) => feed.updated(),
@@ -66,15 +64,20 @@ const resolvers = {
 		title: (item) => item.title(),
 		description: (item) => item.description(),
 		content: (item) => item.content(),
-		links: (item) => item.links()?.map(({ href }) => href),
+		links: (item) => item.links() && item.links().map(({ href }) => href),
 		updated: (item) => item.updated(),
 		published: (item) => item.published(),
 		image: (item) => item.image(),
 	},
 };
 
-const server = new ApolloServer({ typeDefs, resolvers });
+const server = new ApolloServer({
+	typeDefs,
+	resolvers,
+	playground: true,
+	introspection: true,
+});
 
-server.listen().then(({ url }) => {
-	console.log(`🚀  Server ready at ${url}`);
+module.exports = server.createHandler({
+	path: "/api/graphql",
 });

@@ -4,8 +4,8 @@
 	"main": "index.js",
 	"license": "MIT",
 	"scripts": {
-    "dev": "micro"
-  },
+		"dev": "micro"
+	},
 	"dependencies": {
 		"apollo-server-micro": "^2.17.0",
 		"graphql": "^15.3.0",

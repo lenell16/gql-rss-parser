@@ -1,0 +1,20 @@
+{
+    "id": $.feed.id._text,
+    "title": $.feed.title._text,
+    "published": $.feed.published._text,
+    "feedURL": $feedURL,
+    "link": $.feed.author.uri._text,
+    "items": $items
+}
+where
+    $feedURL = ($.feed.link | filter $ => ._attributes.rel == "self" | $[0]._attributes.href)
+    $items = ($.feed.entry
+        | map($ => {
+            "id": $.id._text,
+            "title": $.title._text,
+            "author": $.author.name._text,
+            "link": $.link._attributes.href,
+            "image": $["media:group"]["media:thumbnail"]._attributes.url,
+            "updated": $.updated._text,
+            "published": $.published._text
+        }))

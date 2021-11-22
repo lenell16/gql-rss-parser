@@ -1,83 +1,75 @@
 require("regenerator-runtime/runtime");
-const { get } = require("httpie");
-const { parse } = require("unread");
 const { ApolloServer, gql } = require("apollo-server-micro");
+const fs = require("fs");
+const path = require("path");
+const emuto = require("node-emuto");
+const { get } = require("httpie");
+const convert = require("xml-js");
+const cors = require("micro-cors")();
+
+const transformPath = path.resolve(__dirname, "feedTransform.emu");
+const transformString = fs.readFileSync(transformPath, "utf8");
+const compliedTransform = emuto(transformString);
 
 const typeDefs = gql`
 	type Feed {
 		id: String
 		title: String
-		description: String
 		feedURL: String
-		updated: String
 		published: String
-		language: String
-		image: String
-		generator: String
-		links: [String]
+		link: String
 		items: [Item]
-	}
-
-	type Link {
-		href: String
 	}
 
 	type Item {
 		id: String
 		title: String
-		description: String
-		content: String
+		author: String
 		updated: String
 		published: String
 		image: String
-		links: [String]
+		link: String
 	}
 
 	type Query {
 		feed(url: String!): Feed
+		feeds(urls: [String!]!): [Feed]
 	}
 `;
+
+const getFeed = async (url) => {
+	const { data } = await get(url);
+	const result = convert.xml2js(data, { compact: true });
+	const tranformedResult = compliedTransform(result);
+	return tranformedResult;
+};
 
 const resolvers = {
 	Query: {
 		feed: async (_, args) => {
-			const { data } = await get(args.url);
-			const output = await parse(data);
-			return output;
+			const feed = await getFeed(args.url);
+			return feed;
 		},
-	},
-	Feed: {
-		title: ({ feed }) => feed.title(),
-		links: ({ feed }) => feed.links() && feed.links().map(({ href }) => href),
-		description: ({ feed }) => feed.description(),
-		feedURL: ({ feed }) => feed.feedURL(),
-		updated: ({ feed }) => feed.updated(),
-		published: ({ feed }) => feed.published(),
-		language: ({ feed }) => feed.language(),
-		image: ({ feed }) => feed.image(),
-		id: ({ feed }) => feed.id(),
-		generator: ({ feed }) => feed.generator(),
-		items: ({ items }) => items,
-	},
-	Item: {
-		id: (item) => item.id(),
-		title: (item) => item.title(),
-		description: (item) => item.description(),
-		content: (item) => item.content(),
-		links: (item) => item.links() && item.links().map(({ href }) => href),
-		updated: (item) => item.updated(),
-		published: (item) => item.published(),
-		image: (item) => item.image(),
+		feeds: async (_, args) => {
+			const feeds = await Promise.all(args.urls.map(getFeed));
+			return feeds;
+		},
 	},
 };
 
-const server = new ApolloServer({
+const apolloServer = new ApolloServer({
 	typeDefs,
 	resolvers,
 	playground: true,
 	introspection: true,
 });
 
-module.exports = server.createHandler({
-	path: "/api/graphql",
+const handler = apolloServer.createHandler({ path: "/api/graphql" });
+
+module.exports = cors((req, res) => {
+	if (req.method === "OPTIONS") {
+		res.end();
+		return;
+	}
+	return handler(req, res);
 });
